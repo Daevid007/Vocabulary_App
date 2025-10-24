@@ -1,0 +1,126 @@
+/* General body styling */
+body {
+  font-family: system-ui, sans-serif;
+  background-color: #fff7f0;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+/* Headline */
+h1 {
+  color: #e63946;
+  margin-bottom: 30px;
+  font-size: 2rem;
+}
+
+/* Buttons */
+button {
+  display: block;
+  width: 220px;
+  padding: 15px;
+  margin: 15px auto;
+  font-size: 18px;
+  border-radius: 12px;
+  border: none;
+  background-color: #f4a261;
+  color: white;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background-color: #e76f51;
+}
+
+/* Message container at bottom center */
+#messageContainer {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 16px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: white;
+  background-color: rgba(0, 128, 0, 0.8); /* green for success */
+  display: none;
+  z-index: 1000;
+}
+
+#messageContainer.error {
+  background-color: rgba(220, 20, 60, 0.8); /* red for error */
+}
+
+/* Table wrapper for horizontal scroll */
+.table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  max-width: 100vw; /* ensure it fits screen width */
+  margin: 0 auto;
+  -webkit-overflow-scrolling: touch; /* smooth scrolling on mobile */
+}
+
+/* Results table */
+#resultsTable {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 800px; /* wider to force scroll if needed */
+  font-size: 14px;
+}
+
+#resultsTable th, #resultsTable td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+}
+
+#resultsTable th {
+  background-color: #f4a261;
+  color: white;
+  cursor: pointer;
+}
+
+#resultsTable tr:nth-child(even) {
+  background-color: #fff1e6;
+}
+
+#resultsTable tr:hover {
+  background-color: #ffe6cc;
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+  #resultsTable {
+    font-size: 13px;
+  }
+  #resultsTable th, #resultsTable td {
+    padding: 5px;
+  }
+}
+
+@media (max-width: 500px) {
+  #resultsTable {
+    font-size: 12px;
+  }
+  #resultsTable th, #resultsTable td {
+    padding: 4px;
+  }
+}
+
+/* Training buttons container */
+.training-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px; /* minimal vertical spacing */
+  margin-top: 10px;
+}
+
+.training-buttons button {
+  width: 180px;
+  padding: 10px 20px;
+  font-size: 16px;
+  margin: 0; /* remove default margin so gap works */
+}
