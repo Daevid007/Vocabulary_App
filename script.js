@@ -317,47 +317,76 @@ document.addEventListener("DOMContentLoaded", () => {
   wrongBtn.addEventListener("click", () => recordWeightedAnswer(false));
 
   // ===== Weighted Training: lower score = higher chance =====
-  function showNextWeightedWord() {
-    if (!trainingWords.length) return;
+function showNextWeightedWord() {
+  if (!trainingWords.length) return;
 
-    const weightedWords = [];
-    trainingWords.forEach(word => {
-      const score = computeScore(word); 
-      const weight = Math.ceil((1 - score) * 10); 
-      for (let i = 0; i < weight; i++) weightedWords.push(word);
-    });
+  const weightedWords = [];
 
-    const randIndex = Math.floor(Math.random() * weightedWords.length);
-    currentWord = weightedWords[randIndex];
+  // Weighting parameters (tweak these)
+  const power = 2;   // how strongly low-score words are prioritized (1 = linear, 2 = quadratic)
+  const scale = 12;  // overall pool size multiplier; higher = smoother randomness
 
-    showingAnswer = false;
-    flipDirection = Math.random() < 0.5;
-    showWord(currentWord, false);
-  }
+  trainingWords.forEach(word => {
+    const score = computeScore(word); // freshly recalculated each round
+    const rawWeight = Math.pow(1 - score, power) * scale;
+    const weight = Math.max(1, Math.round(rawWeight)); // ensure every word appears at least once
 
-  // ===== Compute Sigmoid Score =====
+    // Push word multiple times according to weight
+    for (let i = 0; i < weight; i++) {
+      weightedWords.push(word);
+    }
+  });
+
+  // Pick a random entry from the weighted list
+  const randIndex = Math.floor(Math.random() * weightedWords.length);
+  currentWord = weightedWords[randIndex];
+
+  showingAnswer = false;
+  flipDirection = Math.random() < 0.5;
+  showWord(currentWord, false);
+}
+
+
+  // ===== Compute Score =====
 function computeScore(word) {
-  const total = word.overallResults.length;
-  const correct = word.overallResults.filter(r => r === "Correct").length;
-  const recent = word.lastResults.length;
-  const recentCorrect = word.lastResults.filter(r => r === "Correct").length;
+  // --- safe defaults ---
+  const overallArr = Array.isArray(word.overallResults) ? word.overallResults : [];
+  const recentArr  = Array.isArray(word.lastResults) ? word.lastResults : [];
 
-  const overall = total ? correct / total : 0;
-  const recentFrac = recent ? recentCorrect / recent : 0;
+  const total = overallArr.length;
+  const correct = overallArr.filter(r => r === "Correct").length;
+  const recent = recentArr.length;
+  const recentCorrect = recentArr.filter(r => r === "Correct").length;
 
-  // 1️⃣  Days since last asked (cap to avoid huge values)
-  const days = word.lastAsked ? (Date.now() - word.lastAsked) / (1000 * 60 * 60 * 24) : Infinity;
-  const recencyFactor = 1 / (1 + Math.exp((days - 7) / 3)); 
-  // ~1 if asked today, ~0.5 after 7 days, ~0.1 after 14+
+  const overallFrac = total ? (correct / total) : 0;      // long-term accuracy [0..1]
+  const recentFrac  = recent ? (recentCorrect / recent) : 0; // short-term accuracy [0..1]
 
-  // 2️⃣  Weighted learning confidence (recent answers weigh more)
-  const learningConfidence = 0.7 * recentFrac + 0.3 * overall;
+  // Blend recent vs overall — tune alpha in [0..1] (higher = trust recent more)
+  const alpha = 0.7;
+  const learningConfidence = alpha * recentFrac + (1 - alpha) * overallFrac; // [0..1]
 
-  // 3️⃣  Combine confidence and recency
-// Probability of recall decay
-  const forgetting = Math.exp(-days / (1 + 5 * learningConfidence));
-  return 1 - forgetting; // Higher = better memory, lower chance to ask
+  // Days since last asked.
+  // Your default is 0 for "never asked" — treat 0/invalid as "long time ago"
+  let last = Number(word.lastAsked);
+  if (!Number.isFinite(last) || last === 0) {
+    // never asked -> treat as very long ago so it gets priority
+    last = Date.now() - (365 * 24 * 60 * 60 * 1000); // 1 year ago
+  }
+  const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
 
+  // --- retention model: exponential forgetting ---
+  // Base time constant (days) for weak items, and multiplier controlled by confidence.
+  const baseTau = 2;         // days for very weak items
+  const tauMultiplier = 6;   // how much larger tau becomes for strong items
+  const tau = baseTau * (1 + tauMultiplier * learningConfidence); // tau >= baseTau
+
+  const retention = Math.exp(-days / tau); // in (0..1], higher if recent & large tau
+
+  // Final mastery score: how well user currently remembers the item
+  const score = learningConfidence * retention; // [0..1]
+
+  // clamp numeric issues
+  return Math.min(Math.max(score || 0, 0), 1);
 }
 
 
