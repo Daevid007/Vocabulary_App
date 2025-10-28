@@ -336,22 +336,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ===== Compute Sigmoid Score =====
-  function computeScore(word) {
-    const overallAttempts = word.overallResults.length || 1;
-    const overallRight = word.overallResults.filter(r => r === "Correct").length;
+function computeScore(word) {
+  const total = word.overallResults.length;
+  const correct = word.overallResults.filter(r => r === "Correct").length;
+  const recent = word.lastResults.length;
+  const recentCorrect = word.lastResults.filter(r => r === "Correct").length;
 
-    const last4Attempts = word.lastResults.length || 1;
-    const last4Right = word.lastResults.filter(r => r === "Correct").length;
+  const overall = total ? correct / total : 0;
+  const recentFrac = recent ? recentCorrect / recent : 0;
 
-    const overallFraction = overallRight / overallAttempts;
-    const last4Fraction = last4Right / last4Attempts;
+  // 1️⃣  Days since last asked (cap to avoid huge values)
+  const days = word.lastAsked ? (Date.now() - word.lastAsked) / (1000 * 60 * 60 * 24) : Infinity;
+  const recencyFactor = 1 / (1 + Math.exp((days - 7) / 3)); 
+  // ~1 if asked today, ~0.5 after 7 days, ~0.1 after 14+
 
-    const daysSinceLast = word.lastAsked ? (Date.now() - word.lastAsked) / (1000 * 60 * 60 * 24) : 0;
+  // 2️⃣  Weighted learning confidence (recent answers weigh more)
+  const learningConfidence = 0.7 * recentFrac + 0.3 * overall;
 
-    const rawScore = overallFraction + 2 * last4Fraction - 0.2 * daysSinceLast;
+  // 3️⃣  Combine confidence and recency
+// Probability of recall decay
+  const forgetting = Math.exp(-days / (1 + 5 * learningConfidence));
+  return 1 - forgetting; // Higher = better memory, lower chance to ask
 
-    return 1 / (1 + Math.exp(-rawScore));
-  }
+}
+
 
   // ===== Show Word =====
   function showWord(word, reveal) {
