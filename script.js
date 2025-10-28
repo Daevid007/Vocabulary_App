@@ -72,6 +72,35 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsText(file);
   });
 
+
+    // ===== Export Data Button =====
+  const exportDataBtn = document.getElementById("exportDataBtn");
+
+  exportDataBtn && exportDataBtn.addEventListener("click", () => {
+    // Prefer the in-memory `words` (reflects current session); fallback to localStorage
+    const data = (words && words.length) ? words : (JSON.parse(localStorage.getItem("vocabulary")) || []);
+
+    if (!data || !data.length) {
+      showMessage("⚠️ No data to export. Load or train first.", true);
+      return;
+    }
+
+    const filename = `spanish_trainer_export_${new Date().toISOString().slice(0,19).replace(/[:T]/g, '-')}.json`;
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+    showMessage("✅ Data exported: " + filename);
+  });
+
   // ===== Show Message =====
   function showMessage(text, isError = false) {
     const container = document.getElementById("messageContainer");
