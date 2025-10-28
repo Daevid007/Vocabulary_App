@@ -34,34 +34,125 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+        reader.onload = (e) => {
       try {
         const rawWords = JSON.parse(e.target.result);
         let stored = JSON.parse(localStorage.getItem("vocabulary")) || [];
 
+        // Normalization defaults to compare all columns consistently.
+        const defaults = {
+          spanish: "",
+          english: "",
+          // IMPORTANT: default lastAsked is 0 if missing in incoming data
+          lastAsked: 0,
+          lastResults: [],
+          overallResults: [],
+          score: 0,
+          chapter: 0,
+          unit: 0,
+          type: "unknown"
+        };
+
+        function normalizeIncoming(obj) {
+          // We do NOT override a present lastAsked — only use default 0 if absent/empty.
+          const out = Object.assign({}, defaults);
+
+          out.spanish = obj.spanish || "";
+          out.english = obj.english || "";
+
+          // lastAsked: keep incoming if provided (not null/empty string), otherwise 0
+          if (obj.hasOwnProperty("lastAsked") && obj.lastAsked !== null && obj.lastAsked !== "") {
+            out.lastAsked = obj.lastAsked;
+          } else {
+            out.lastAsked = 0;
+          }
+
+          out.lastResults = Array.isArray(obj.lastResults) ? obj.lastResults.slice() : [];
+          out.overallResults = Array.isArray(obj.overallResults) ? obj.overallResults.slice() : [];
+          out.score = typeof obj.score === "number" ? obj.score : 0;
+          out.chapter = obj.chapter !== undefined && obj.chapter !== null ? obj.chapter : 0;
+          out.unit = obj.unit !== undefined && obj.unit !== null ? obj.unit : 0;
+          out.type = obj.type || "unknown";
+
+          return out;
+        }
+
+        function normalizeStored(obj) {
+          // Stored entries may have been saved with null for lastAsked previously;
+          // treat null/undefined as 0 for comparison consistency.
+          const out = Object.assign({}, defaults);
+
+          out.spanish = obj.spanish || "";
+          out.english = obj.english || "";
+          out.lastAsked = obj.lastAsked !== undefined && obj.lastAsked !== null && obj.lastAsked !== "" ? obj.lastAsked : 0;
+          out.lastResults = Array.isArray(obj.lastResults) ? obj.lastResults.slice() : [];
+          out.overallResults = Array.isArray(obj.overallResults) ? obj.overallResults.slice() : [];
+          out.score = typeof obj.score === "number" ? obj.score : 0;
+          out.chapter = obj.chapter !== undefined && obj.chapter !== null ? obj.chapter : 0;
+          out.unit = obj.unit !== undefined && obj.unit !== null ? obj.unit : 0;
+          out.type = obj.type || "unknown";
+
+          return out;
+        }
+
+        function objectsEqual(a, b) {
+          // Strict comparison for all relevant fields.
+          if (String(a.spanish) !== String(b.spanish)) return false;
+          if (String(a.english) !== String(b.english)) return false;
+          if (Number(a.lastAsked) !== Number(b.lastAsked)) return false;
+          if (Number(a.score) !== Number(b.score)) return false;
+          if (Number(a.chapter) !== Number(b.chapter)) return false;
+          if (Number(a.unit) !== Number(b.unit)) return false;
+          if (String(a.type) !== String(b.type)) return false;
+
+          // Compare arrays (order-sensitive). If you want order-insensitive,
+          // we can change to count-based compare.
+          if (a.lastResults.length !== b.lastResults.length) return false;
+          for (let i = 0; i < a.lastResults.length; i++) {
+            if (String(a.lastResults[i]) !== String(b.lastResults[i])) return false;
+          }
+
+          if (a.overallResults.length !== b.overallResults.length) return false;
+          for (let i = 0; i < a.overallResults.length; i++) {
+            if (String(a.overallResults[i]) !== String(b.overallResults[i])) return false;
+          }
+
+          return true;
+        }
+
+        let added = 0;
+        let skipped = 0;
+
         rawWords.forEach(newWord => {
-          const exists = stored.some(
-            w => w.spanish === newWord.spanish && w.english === newWord.english
-          );
+          const normNew = normalizeIncoming(newWord);
+
+          const exists = stored.some(storedWord => {
+            const normStored = normalizeStored(storedWord);
+            return objectsEqual(normStored, normNew);
+          });
 
           if (!exists) {
+            // When adding, store the incoming values but ensure lastAsked default is 0 if missing
             stored.push({
-              spanish: newWord.spanish,
-              english: newWord.english,
-              lastAsked: null,
-              lastResults: [],
-              overallResults: [],
-              score: 0,
-              chapter: newWord.chapter || 0,
-              unit: newWord.unit || 0,
+              spanish: newWord.spanish || "",
+              english: newWord.english || "",
+              lastAsked: (newWord.hasOwnProperty("lastAsked") && newWord.lastAsked !== null && newWord.lastAsked !== "") ? newWord.lastAsked : 0,
+              lastResults: Array.isArray(newWord.lastResults) ? newWord.lastResults.slice() : [],
+              overallResults: Array.isArray(newWord.overallResults) ? newWord.overallResults.slice() : [],
+              score: typeof newWord.score === "number" ? newWord.score : 0,
+              chapter: newWord.chapter !== undefined && newWord.chapter !== null ? newWord.chapter : 0,
+              unit: newWord.unit !== undefined && newWord.unit !== null ? newWord.unit : 0,
               type: newWord.type || "unknown"
             });
+            added++;
+          } else {
+            skipped++;
           }
         });
 
         words = stored;
         localStorage.setItem("vocabulary", JSON.stringify(words));
-        showMessage(`Loaded ${rawWords.length} words. Total now: ${words.length}.`);
+        showMessage(`Imported: ${rawWords.length} entries — Added: ${added}, Skipped (duplicates): ${skipped}. Total now: ${words.length}.`);
       } catch (err) {
         console.error("Error parsing JSON file:", err);
         showMessage("Error parsing JSON file", true);
@@ -69,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       fileInput.value = "";
     };
-    reader.readAsText(file);
+  reader.readAsText(file);
   });
 
 
